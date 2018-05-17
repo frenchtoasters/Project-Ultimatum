@@ -1,18 +1,3 @@
-<p align="center">
-  <img
-    src="http://neonexchange.org/img/NEX-logo.svg"
-    width="125px;">
-    
-</p>
-<h3 align="center">Neo ICO Template</h3>
-<p align="center">A template for NEP5 Compliant Tokens on the NEO platform</p>
-<hr/>
-
-#### Considerations
-
-An article describing this template is available here:
-
-https://medium.com/neon-exchange/nex-ico-template-4ca7ba19fc8b
 
 #### Requirements
 
