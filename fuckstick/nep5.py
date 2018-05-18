@@ -143,6 +143,60 @@ def handle_nep51(ctx, operation, args):
             pool = find_pool(pool_id)
             - True ? pool_id['max'] > (pool_id['current'] + size)
             - False ? pool_id['max'] <= (pool_id['current'] + size)
+
+    Add_Deposit_ID:
+        Args:
+            - deposit_id
+            - amount
+            - pool_id
+        Return:
+            - True ? current = storage.get(deposit_ids) && storag.put(current + amount) for pool_id 
+            - False ? else
+
+    Workflow:
+    Operator Sends following post request:
+        {
+            "operator_key":"11111", #Public key of wallet
+            "operator_msg":"222222", #Sign message of the function they are calling
+            "size":"100", #Number of NEO for pool
+            "min":"1", #Min number of NEO you can deposit
+            "max":"4" #Max number of NEO you can deposit
+        }
+    System returns, and writes to storage:
+        {
+            "pool_id":"x000033",
+            "size": 100,
+            "min": 1,
+            "max": 4,
+            "current": 0,
+            "operator_key":"11111",
+            "last_msg":"222222",
+            "deposit_ids": {},
+            "result":True
+        }
+
+    Contributor post following requst:
+        {
+            "pool_id":"x000033",
+            "amount": 1, #Number NEO less than max for pool, need verification call
+        }
+    System returns:
+        {
+            "deposit_id":"x9343", #Hash of tx? something more unique?
+            "result": True #amount less than max and pool['current'] less than pool['max']
+        }
+    System executes:
+        Take deposit into smart contract
+        Verify amount < pool['max'] && pool['size'] for pool_id
+        Add deposit_id to pool['deposit_ids'] for correct pool_id
+        Increment pool['current'] for pool_id
+        Tag Deposited NEO with pool_id
+
+        Invoke smart contract
+        Verify pool['operator_key'] == operator_key
+        Check that operator_msg && pool['last_msg'] were signed by pool['operator_key']
+        Preform operator_msg
+        Set pool['last_msg'] == operator_msg
     '''
 
     return False
