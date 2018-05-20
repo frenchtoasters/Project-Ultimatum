@@ -48,7 +48,7 @@ def Main(operation, args):
                 return False
             if !Put(pool_id+':state',agrgs[5]):
                 return False
-            if !Put(pool_id+':deposit_ids','0x0'):
+            if !Put(pool_id+':deposit_ids',[]):
                 return False
             if !Put(pool_id+':current','0'):
                 return False
@@ -82,12 +82,15 @@ def Main(operation, args):
                 return False
             
             #Update Hash of deposit_ids
+            reciepts = Get(pool_id+':deposit_ids')
+            reciept = genDeposit(args)
+            if reciept:
+                reciepts = ids.append(reciept)
+                if !Put(pool_id+':depsit_ids',reciepts):
+                    return False
+            return reciept
 
-
-
-
-            return True
-
+        #Could also be called operatorWithdraw
         if operation == 'ownerWithdraw':
             if not CheckWitness(OWNER):
                 print('only the contract owner can withdraw MCT from the contract')
@@ -118,7 +121,22 @@ def Main(operation, args):
 
 
 def handle_token_received(chash, args):
-
+    '''
+    This section needs a rewrite to handle the switch of token to take anything sent, other than MCT if the MCT balance is < min stake, and then forward it to operator_key(public key of operator)[pool_id]
+    Workflow:
+        Args:
+            from
+            to
+            amount
+            pool_id
+        Return:
+            - True ? Tx to pool_id == True
+            - False ? Tx to pool_id == False || TBD # There is probably something im forgetting
+        Script:
+            - Verifiy arguments sent are valid, return False if not
+            - Verifiy if from is owner, only accept MCT <= minStake
+            - Take deposit and forward to pool_id['operator_key']
+    '''
     arglen = len(args)
 
     if arglen < 3:
