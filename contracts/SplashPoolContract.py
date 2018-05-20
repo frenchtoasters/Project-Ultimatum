@@ -134,7 +134,7 @@ def handle_token_received(chash, args):
             - False ? Tx to pool_id == False || TBD # There is probably something im forgetting
         Script:
             - Verifiy arguments sent are valid, return False if not
-            - Verifiy if from is owner, only accept MCT <= minStake
+            - Verifiy if from is owner, accept MCT <= minStake. If from other accept SPLASH as fee payment, else reject
             - Take deposit and forward to pool_id['operator_key']
     '''
     arglen = len(args)
