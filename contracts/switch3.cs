@@ -5,9 +5,9 @@ using System;
 using System.ComponentModel;
 using System.Numerics;
 
-namespace splashpool
+namespace switcheo
 {
-    public class SplashPool : SmartContract
+    public class Switch3 : SmartContract
     {
         //public delegate object NEP5Contract(string method, object[] args);
 
@@ -129,7 +129,7 @@ namespace splashpool
         }
 
         /// <summary>
-        ///   This is the SplashPool smart contract entrypoint.
+        ///   This is the Switcheo smart contract entrypoint.
         /// 
         ///   Parameter List: 0710
         ///   Return List: 05
