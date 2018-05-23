@@ -1,0 +1,2 @@
+c:\users\toast\source\repos\SplashPoolFull\SplashPoolFull\obj\Debug\SplashPoolFull.csprojAssemblyReference.cache
+c:\users\toast\source\repos\SplashPoolFull\SplashPoolFull\obj\Debug\SplashPoolFull.csproj.CoreCompileInputs.cache
