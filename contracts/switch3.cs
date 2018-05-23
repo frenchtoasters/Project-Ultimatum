@@ -5,9 +5,9 @@ using System;
 using System.ComponentModel;
 using System.Numerics;
 
-namespace splashpool
+namespace switcheo
 {
-    public class SplashPool : SmartContract
+    public class Switch3 : SmartContract
     {
         //public delegate object NEP5Contract(string method, object[] args);
 
@@ -129,7 +129,7 @@ namespace splashpool
         }
 
         /// <summary>
-        ///   This is the SplashPool smart contract entrypoint.
+        ///   This is the Switcheo smart contract entrypoint.
         /// 
         ///   Parameter List: 0710
         ///   Return List: 05
@@ -472,7 +472,7 @@ namespace splashpool
             return true;
         }
 
-        private static bool CompletePool(byte[] operatorAddress, byte[] poolID, byte[] poolHash, BigInteger amountToFill, bool useNativeTokens)
+        private static bool CompletePool(byte[] Address, byte[] poolID, byte[] poolHash, BigInteger amountToFill, bool useNativeTokens)
         {
 		/*
 		 *
@@ -484,28 +484,38 @@ namespace splashpool
 		 * poolHash //this is where the MakerCommand value will come from 
 		 *
 		 */
-            // Check that transaction is signed by the operator
-            if (!Runtime.CheckWitness(operatorAddress)) return false;
+            // Check that transaction is signed by the filler
+            if (!Runtime.CheckWitness(fillerAddress)) return false;
 
-            // Check that the pool still exists
-            Pool pool = GetContributions(poolID, offerHash);
-            if (pool.MakerAddress == Empty)
+            // Check that the offer still exists 
+            Offer offer = GetOffer(tradingPair, offerHash);
+            if (offer.MakerAddress == Empty)
             {
                 // Notify clients of failure
-                Failed(operatorAddress, poolHash);
+                Failed(fillerAddress, offerHash);
                 return true;
             }
 
-	    // This is where we need to change verification
-	    // Make sure the operatorAddress is same as MakerAddress
-            if (operatorAddress != pool.MakerAddress) return false;
+            // Check that the filler is different from the maker
+            if (fillerAddress == offer.MakerAddress) return false;
 
-	    /*
-	     * Here is where we figure out Fee stuff, im not really a fan of 
-	     * Fee's if we can get awawy with it. 
-	     *
-	     *
-	    
+            // Calculate max amount that can be offered & filled
+            BigInteger amountToTake = (offer.OfferAmount * amountToFill) / offer.WantAmount;
+            if (amountToTake > offer.AvailableAmount)
+            {
+                amountToTake = offer.AvailableAmount;
+                amountToFill = (amountToTake * offer.WantAmount) / offer.OfferAmount;
+            }
+            // Check that the amount that will be given is at least 1
+            if (amountToTake <= 0)
+            {
+                // Notify clients of failure
+                Failed(fillerAddress, offerHash);
+                return true;
+            }
+
+            // Reduce available balance for the filled asset and amount
+            if (amountToFill > 0 && !ReduceBalance(fillerAddress, offer.WantAssetID, amountToFill)) return false;
 
             // Calculate offered amount and fees
             byte[] feeAddress = Storage.Get(Context(), "feeAddress");
@@ -515,41 +525,51 @@ namespace splashpool
             BigInteger takerFee = (amountToTake * takerFeeRate) / feeFactor;
             BigInteger nativeFee = 0;
 
-            // Calculate Fees If Any
+            // Calculate native fees (SWH)
             if (offer.OfferAssetID == NativeToken) {
                 nativeFee = takerFee / nativeTokenDiscount;
             }
-	    */
-	    
-	    /*
-	     *
-	     * Need to add verification of currentEpoch and EndTime?
-	     * Need to add verification of MakerCommand
-	     *
-	     */
+            else if (useNativeTokens)
+            {
+                Runtime.Log("Using Native Fees...");
+
+                // Use current trading period's exchange rate
+                var bucketNumber = CurrentBucket();
+                Volume volume = GetVolume(bucketNumber, offer.OfferAssetID);
 
 
-            // Move asset to the operator balance and notify clients
-            //var takerAmount = amountToTake - (nativeFee > 0 ? 0 : takerFee);
-	    TransferAssetTo(operatorAddress, pool.PoolAssetID, amountToFill);
-	    Transferred(operatorAddress, pool.PoolAssetID, amountToFill);
+                // Derive rate from volumes traded
+                var nativeVolume = volume.Native;
+                var foreignVolume = volume.Foreign;
 
-            // Move asset back to the user when deposited and notify clients
-            // 
-	    // This is going to need some work for later, will require going through
-	    // all the deposits and gathering amounts made. 
-	    //
-	    // THIS REQUIRES NEW VAR IN Pool STRUCT!!!!!!!!!!!!!!!!!!!!!!!!!
-	    //
-            //TransferAssetTo(offer.MakerAddress, offer.WantAssetID, makerAmount);
-            //Transferred(offer.MakerAddress, offer.WantAssetID, makerAmount);
+                // Use native fee, if we can get an exchange rate
+                if (foreignVolume > 0)
+                {
+                    nativeFee = (takerFee * nativeVolume) / (foreignVolume * nativeTokenDiscount);
+                }
+                // Reduce balance immediately from taker
+                if (!ReduceBalance(fillerAddress, NativeToken, nativeFee))
+                {
+                    // Reset to 0 if balance is insufficient
+                    nativeFee = 0;
+                }
+            }
+
+            // Move asset to the taker balance and notify clients
+            var takerAmount = amountToTake - (nativeFee > 0 ? 0 : takerFee);
+            TransferAssetTo(fillerAddress, offer.OfferAssetID, takerAmount);
+            Transferred(fillerAddress, offer.OfferAssetID, takerAmount);
+
+            // Move asset to the maker balance and notify clients
+            var makerAmount = amountToFill - makerFee;
+            TransferAssetTo(offer.MakerAddress, offer.WantAssetID, makerAmount);
+            Transferred(offer.MakerAddress, offer.WantAssetID, makerAmount);
 
             // Move fees
-            //if (makerFee > 0) TransferAssetTo(feeAddress, offer.WantAssetID, makerFee);
-            //if (nativeFee == 0) TransferAssetTo(feeAddress, offer.OfferAssetID, takerFee);
+            if (makerFee > 0) TransferAssetTo(feeAddress, offer.WantAssetID, makerFee);
+            if (nativeFee == 0) TransferAssetTo(feeAddress, offer.OfferAssetID, takerFee);
 
             // Update native token exchange rate
-	    /*
             if (offer.OfferAssetID == NativeToken)
             {
                 AddVolume(offer.WantAssetID, amountToFill, amountToTake);
@@ -558,44 +578,38 @@ namespace splashpool
             {
                 AddVolume(offer.OfferAssetID, amountToTake, amountToFill);
             }
-	    */
 
-            // Update pool status
-            //pool.PoolCategory = NOT SURE WHAT TO PUT HERE;
+            // Update available amount
+            offer.AvailableAmount = offer.AvailableAmount - amountToTake;
 
             // Store updated offer
-            StorePool(operatorAddress, poolHash, pool);
+            StoreOffer(tradingPair, offerHash, offer);
 
             // Notify clients
-            Filled(operatorAddress, poolHash, amountToFill, pool.PoolAssetID, pool.Amount);
+            Filled(fillerAddress, offerHash, amountToFill, offer.OfferAssetID, offer.OfferAmount, offer.WantAssetID, offer.WantAmount);
             return true;
         }
 
-        private static bool CancelOffer(byte[] poolID, byte[] poolHash)
+        private static bool CancelOffer(byte[] tradingPair, byte[] offerHash)
         {
             // Check that the offer exists
-            Pool pool = GetContributions(poolID, poolHash);
-            if (pool.MakerAddress == Empty) return false;
+            Offer offer = GetOffer(tradingPair, offerHash);
+            if (offer.MakerAddress == Empty) return false;
 
             // Check that transaction is signed by the canceller
-            if (!Runtime.CheckWitness(pool.MakerAddress)) return false;
+            if (!Runtime.CheckWitness(offer.MakerAddress)) return false;
 
-            // Return Funds to contributors
-	    //
-	    // This is going to need some work.
-	    // Need to figure out how to store their recipts first.
-	    //
-            // TransferAssetTo(pool.MakerAddress, pool.PoolAssetID, pool.AvailableAmount);
+            // Move funds to withdrawal address
+            TransferAssetTo(offer.MakerAddress, offer.OfferAssetID, offer.AvailableAmount);
 
             // Remove offer
-            RemovePool(poolID, poolHash);
+            RemoveOffer(tradingPair, offerHash);
 
             // Notify runtime
-            Cancelled(pool.MakerAddress, poolHash);
+            Cancelled(offer.MakerAddress, offerHash);
             return true;
         }
-        
-	/*	
+                        
         private static bool SetMakerFee(BigInteger fee, byte[] assetID)
         {
             if (fee > maxFee) return false;
@@ -623,7 +637,7 @@ namespace splashpool
 
             return true;
         }
-	*/
+
         private static object ProcessWithdrawal()
         {
             var currentTxn = (Transaction)ExecutionEngine.ScriptContainer;
@@ -750,36 +764,36 @@ namespace splashpool
             return Storage.Get(Context(), WhitelistKey(assetID)).Length > 0;
         }
 
-        private static Pool GetPool(byte[] poolID, byte[] hash)
+        private static Offer GetOffer(byte[] tradingPair, byte[] hash)
         {
-            byte[] poolData = Storage.Get(Context(), poolID.Concat(hash));
-            if (poolData.Length == 0) return new Pool();
+            byte[] offerData = Storage.Get(Context(), tradingPair.Concat(hash));
+            if (offerData.Length == 0) return new Offer();
 
             Runtime.Log("Deserializing offer");
-            return (Pool)poolData.Deserialize();
+            return (Offer)offerData.Deserialize();
         }
 
-        private static void StorePool(byte[] poolID, byte[] poolHash, Pool pool)
+        private static void StoreOffer(byte[] tradingPair, byte[] offerHash, Offer offer)
         {
-            // Remove pool if completely filled
-            if (pool.CurrentSize == pool.MaxPool)
+            // Remove offer if completely filled
+            if (offer.AvailableAmount == 0)
             {
-                RemovePool(poolID, poolHash);
+                RemoveOffer(tradingPair, offerHash);
             }
             // Store offer otherwise
             else
             {
                 // Serialize offer
                 Runtime.Log("Serializing offer");
-                var poolData = pool.Serialize();
-                Storage.Put(Context(), poolID.Concat(poolHash), poolData);
+                var offerData = offer.Serialize();
+                Storage.Put(Context(), tradingPair.Concat(offerHash), offerData);
             }
         }
 
-        private static void RemoveOffer(byte[] poolID, byte[] poolHash)
+        private static void RemoveOffer(byte[] tradingPair, byte[] offerHash)
         {
             // Delete offer data
-            Storage.Delete(Context(), poolID.Concat(poolHash));
+            Storage.Delete(Context(), tradingPair.Concat(offerHash));
         }
 
         private static void TransferAssetTo(byte[] originator, byte[] assetID, BigInteger amount)
@@ -894,8 +908,7 @@ namespace splashpool
 
             return Hash256(bytes);
         }
-	
-	/*
+
         // Add volume to the current reference assetID e.g. NEO/SWH: Add nativeAmount to SWH volume and foreignAmount to NEO volume
         private static bool AddVolume(byte[] assetID, BigInteger nativeAmount, BigInteger foreignAmount) 
         {
@@ -941,7 +954,7 @@ namespace splashpool
                 return (Volume)volumeData.Deserialize();
             }
         }
-	*/
+
         // Helpers
         private static StorageContext Context() => Storage.CurrentContext;
         private static BigInteger CurrentBucket() => Runtime.Time / bucketDuration;

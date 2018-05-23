@@ -2,6 +2,7 @@ from boa.interop.Neo.Runtime import GetTrigger, CheckWitness
 from boa.interop.Neo.TriggerType import Application, Verification
 from boa.interop.System.ExecutionEngine import GetExecutingScriptHash, GetCallingScriptHash
 from boa.interop.Neo.App import RegisterAppCall
+from boa.interop.Neo.Storage import Get,Put,Delete,GetContext
 
 OWNER = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
 
@@ -31,30 +32,30 @@ def Main(operation, args):
         if operation == 'createPool':
             if len(args) != 6:
                 return False
-            pool_id = Get('pool_id_latest')
+            pool_id = GetMCT('pool_id_latest')
             pool_id = pool_id + 1
 
             #Create pool_id storage Obj
             #Could need more context to know about specific NEO assoicated with it
-            if !Put(pool_id+':operator_key',args[0]):
+            if !PutMCT(pool_id+':operator_key',args[0]):
                 return False
-            if !Put(pool_id+':operator_msg',args[1]:
+            if !PutMCT(pool_id+':operator_msg',args[1]:
                 return False
-            if !Put(pool_id+':size',args[2]):
+            if !PutMCT(pool_id+':size',args[2]):
                 return False
-            if !Put(pool_id+':min',args[3]):
+            if !PutMCT(pool_id+':min',args[3]):
                 return False
-            if !Put(pool_id+':max',args[4]):
+            if !PutMCT(pool_id+':max',args[4]):
                 return False
-            if !Put(pool_id+':state',agrgs[5]):
+            if !PutMCT(pool_id+':state',agrgs[5]):
                 return False
-            if !Put(pool_id+':deposit_ids',[]):
+            if !PutMCT(pool_id+':deposit_ids',[]):
                 return False
-            if !Put(pool_id+':current','0'):
+            if !PutMCT(pool_id+':current','0'):
                 return False
             
             #Increment pool_id_latest
-            if !Put('pool_id_latest',pool_id):
+            if !PutMCT('pool_id_latest',pool_id):
                 return False
 
             #Something Failed
@@ -70,23 +71,23 @@ def Main(operation, args):
             amount = args[2]
             
             #Validate amount
-            if amount < Get(pool_id+':min'):
+            if amount < GetMCT(pool_id+':min'):
                 return False
-            if amount > Get(pool_id+':max'):
+            if amount > GetMCT(pool_id+':max'):
                 return False
             
             #Validate pool not full
-            size = Get(pool_id+':size')
+            size = GetMCT(pool_id+':size')
             current_new = amount + size
             if current_new > size:
                 return False
             
             #Update Hash of deposit_ids
-            reciepts = Get(pool_id+':deposit_ids')
+            reciepts = GetMCT(pool_id+':deposit_ids')
             reciept = genDeposit(args)
             if reciept:
                 reciepts = ids.append(reciept)
-                if !Put(pool_id+':depsit_ids',reciepts):
+                if !PutMCT(pool_id+':depsit_ids',reciepts):
                     return False
             return reciept
 
@@ -137,18 +138,18 @@ def handle_token_received(chash, args):
             - Verifiy if from is owner, accept MCT <= minStake. If from other accept SPLASH as fee payment, else reject
             - Take deposit and forward to pool_id['operator_key']
     '''
-    arglen = len(args)
-
-    if arglen < 3:
+    if len(args) < 5:
         print('arg length incorrect')
         return False
 
     t_from = args[0]
-    t_to = args[1]
-    t_amount = args[2]
+    to = args[1]
+    amount = args[2]
+    pool_id = args[3]
+    asset_id = args[4]
 
-    if arglen == 4:
-        extra_arg = args[3]  # extra argument passed by transfer()
+    if arglen == 6:
+        extra_arg = args[5]  # extra argument passed by transfer()
 
     if len(t_from) != 20:
         return False
@@ -167,26 +168,31 @@ def handle_token_received(chash, args):
 
     if extra_arg == 'reject-me':
         print('rejecting transfer') 
-        Delete(t_from)
+        DeleteMCT(t_from)
         return False
     else:
-        print('received MCT tokens!')
-        totalsent = Get(t_from)
-        totalsent = totalsent + t_amount
-        if Put(t_from, totalsent):
-            return True
+        print('received tokens!')
+        totalsent = GetMCT(t_from)
+        if asset_id == MCT_SCRIPTHASH: #Asset ID for MCT
+            if PutMCT(t_from, totalsent):
+                return True
+        #This may need to change to normal NEO storage, it will be adding the SPLASH tokens to the smart contract it self
+        if asset_id == myhash:
+            if Put(t_from, totalsent):
+                return True
+
         print('staked storage call failed')
         return False
 
 
 # Staked storage appcalls
 
-def Get(key):
+def GetMCT(key):
     return MCTContract('Get', [key])
 
-def Delete(key):
+def DeleteMCT(key):
     return MCTContract('Delete', [key]) 
 
-def Put(key, value):
+def PutMCT(key, value):
     return MCTContract('Put', [key, value])
 
