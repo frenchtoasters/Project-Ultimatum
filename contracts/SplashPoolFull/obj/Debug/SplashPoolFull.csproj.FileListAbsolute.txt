@@ -1,0 +1,7 @@
+c:\users\toast\source\repos\SplashPoolFull\SplashPoolFull\bin\Debug\SplashPoolFull.dll
+c:\users\toast\source\repos\SplashPoolFull\SplashPoolFull\bin\Debug\SplashPoolFull.pdb
+c:\users\toast\source\repos\SplashPoolFull\SplashPoolFull\bin\Debug\Neo.SmartContract.Framework.dll
+c:\users\toast\source\repos\SplashPoolFull\SplashPoolFull\obj\Debug\SplashPoolFull.csproj.CoreCompileInputs.cache
+c:\users\toast\source\repos\SplashPoolFull\SplashPoolFull\obj\Debug\SplashPoolFull.csproj.CopyComplete
+c:\users\toast\source\repos\SplashPoolFull\SplashPoolFull\obj\Debug\SplashPoolFull.dll
+c:\users\toast\source\repos\SplashPoolFull\SplashPoolFull\obj\Debug\SplashPoolFull.pdb
