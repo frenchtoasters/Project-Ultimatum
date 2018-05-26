@@ -1,0 +1,4 @@
+/home/toastman/Project-Ultimatum/contracts/SplashContract/obj/Debug/netstandard2.0/SplashContract.csprojAssemblyReference.cache
+/home/toastman/Project-Ultimatum/contracts/SplashContract/obj/Debug/netstandard2.0/SplashContract.csproj.CoreCompileInputs.cache
+/home/toastman/Project-Ultimatum/contracts/SplashContract/obj/Debug/netstandard2.0/SplashContract.AssemblyInfoInputs.cache
+/home/toastman/Project-Ultimatum/contracts/SplashContract/obj/Debug/netstandard2.0/SplashContract.AssemblyInfo.cs
