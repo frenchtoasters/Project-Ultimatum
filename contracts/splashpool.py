@@ -9,8 +9,9 @@ wallet tkn_send MCT {from address} {dApp contract address} {minimum stake}
 """
 from boa.interop.Neo.Runtime import GetTrigger, CheckWitness
 from boa.interop.Neo.TriggerType import Application, Verification
-from boa.interop.System.ExecutionEngine import GetExecutingScriptHash, GetCallingScriptHash
+from boa.interop.System.ExecutionEngine import GetExecutingScriptHash, GetCallingScriptHash, GetScriptContainer
 from boa.interop.Neo.App import RegisterAppCall
+from boa.interop.Neo.Transaction import TransactionInput, TransactionOutput, Transaction, ContractTransaction
 
 OWNER = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
 
@@ -25,198 +26,187 @@ MCT_SCRIPTHASH = b'\x8dKL\x14V4\x17\xc6\x91\x91\xe0\x8b\xe0\xb8m\xdc\xb4\xbc\x86
 MCTContract = RegisterAppCall('c186bcb4dc6db8e08be09191c6173456144c4b8d', 'operation', 'args')
 
 def Main(operation, args):
+	trigger = GetTrigger()
 
-    trigger = GetTrigger()
-
-    if trigger == Verification():
-	'''
-	Check if state of contract == {Active,Pending,Frozen}
-	Validate inputs
-	Check that valid self send
-	Validate utxo has been reserved
-	Validate withdraw destination
-	Validate amount withdrawn
-	'''
-        if CheckWitness(OWNER):
-            return True
-
-        return False
-
-    elif trigger == Application():
-
-        if operation == 'initialize':
-	    if not CheckWitness(OWNER):
-		print("initialize error"
+	if trigger == Verification():
+		'''
+		Check if state of contract == {Active,Pending,Frozen}
+		Validate inputs
+		Check that valid self send
+		Validate utxo has been reserved
+		Validate withdraw destination
+		Validate amount withdrawn
+		'''
+		if CheckWitness(OWNER):
+			return True
 		return False
 
-	    if len(args) != 3:
-		print("To few args")
-		return False
+	elif trigger == Application():
 
-	    return Initialize(operation,args)
+		if operation == 'initialize':
+				if not CheckWitness(OWNER):
+					print("initialize error")
+					return False
+				if len(args) != 3:
+					print("To few args")
+					return False
+				return Initialize()
 
-	if opertion == 'getState':
-	    return GetStake()
-
-	if operation == 'getBalance':
-	    return GetBalance(operation,args)
-
-	if operation == 'getPool':
-	    return GetPool(operation,args)
-
-	if operation == 'deopsit':
-	    if GetState() != 'Active':
-			return False
-	    if len(args) != 3:
-			return False
-	    if not VerifySentAmount(operation,args):
-			return False
-	    
-	    if not TransferAssetTo(operation,args):
-			return False
-	    return True
+		if opertion == 'getState':
+			return GetState()
+		if operation == 'getBalance':
+			return GetBalance(args[0],args[1])
+		#if operation == 'getPool':
+		#	return GetPool(args[0],args[1],args[2])
+		if operation == 'deopsit':
+			if GetState() != 'Active':
+				return False
+			if len(args) != 3:
+				return False
+			#if not VerifySentAmount(args[0],args[1],args[2]):
+			#	return False
+			if not TransferAssetTo(args[0],args[1],args[2]):
+				return False
+			return True
+		if operation == 'makeContribution':
+			if GetState() != 'Active':
+				return False
+			if len(args) != 6:
+				return False
 	
-	if operation == 'makeContribution':
-	    if GetState() != 'Active':
-			return False
-
-	    if len(args) != 6:
-			return False
+			contribution = NewContribution(operation,args)
+			return MakeContribution(contribution)
 		
-		contribution = NewContribution(operation,args)
-		return MakeContribution(contribution)
+		if operation == 'completePool':
+			if GetState() != 'Active':
+				return False
+	
+			if len(args) != 5:
+				return False
 
-	if operation == 'completePool':
-		if GetState != 'Active':
+			completePool = NewCompletePool(args[0],args[1],args[2],args[3])
+			pool = GetPool(completePool['PoolID'],completePool['PoolHash'],completePool)
+			return StorePool(completePool['PoolID'],completePool['PoolHash'],pool)
+
+		if operation == 'withdraw':
+			return ProcessWithdrawal()
+
+		#Owner Operations
+		if not CheckWitness(OWNER):
 			return False
+
+		if operation == 'freezePools':
+			Put("state",'Inactive')
+			return True
+
+		if operation == 'unfreezePools':
+			Put("state",'Active')
+			return True
 		
-		if len(args) != 5:
+		if operation == 'addToWhitelist':
+			if len(args) != 1:
+				return False
+			if Get('stateContractWhitelist') == 'Inactive':
+				return False
+			whitelistKey = args[0]+args[1]
+			Put(whitelistKey,'1')
+			return True
+		'''
+			return False
+			if args[1] == 'single':
+				return RemoveSingleWhitelist(args)
+			if args[1] == 'all':
+				Put('stateContractWhitelist','Inactive')
+			return True
+		'''
+		if operation == 'ownerWithdraw':
+			if not CheckWitness(OWNER):
+				print('Only the contract owner can withdraw MCT from the contract')
+				return False
+
+			if len(args) != 1:
+				print('withdraw amount not specified')
+				return False
+        
+			t_amount = args[0]
+			myhash = GetExecutingScriptHash()
+
+			return MCTContract('transfer', [myhash, OWNER, t_amount])
+
+		# end of normal invocations, reject any non-MCT invocations
+
+		caller = GetCallingScriptHash()
+	
+		if caller != MCT_SCRIPTHASH:
+			print('token type not accepted by this contract')
 			return False
 
-		completePool = NewCompletePool(operation,args)
-		pool = GetPool(completePool['PoolID'])
-		return StorePool(completePool['PoolID'],completePool['PoolHash'],pool)
-
-	if operation == 'withdraw':
-		return ProcessWithdrawal()
-
-	#Owner Operations
-	if not CheckWithness(OWNER):
-		return False
-
-	if operation == 'freezePools':
-		Put("state",'Inactive')
-		return True
-
-	if operation == 'unfreezePools':
-		Put("state",'Active')
-		return True
-
-	if operation == 'addToWhitelist':
-		if len(args) != 1:
-			return False
-		if Get('stateContractWhitelist') == 'Inactive':
-			return False
-		whitelistKey = WhitelistKey(operation,args)
-		Put(whitelistKey,'1')
-		return True
-
-
-			return False
-		if args[1] == 'single':
-			return RemoveSingleWhitelist(operation,args)
-		if args[1] == 'all':
-			Put('stateContractWhitelist','Inactive')
-		return True
-
-        if operation == 'ownerWithdraw':
-            if not CheckWitness(OWNER):
-                print('only the contract owner can withdraw MCT from the contract')
-                return False
-
-            if len(args) != 1:
-                print('withdraw amount not specified')
-                return False
-         
-            t_amount = args[0]
-            myhash = GetExecutingScriptHash()
-
-            return MCTContract('transfer', [myhash, OWNER, t_amount])
-
-        # end of normal invocations, reject any non-MCT invocations
-
-        caller = GetCallingScriptHash()
-
-        if caller != MCT_SCRIPTHASH:
-            print('token type not accepted by this contract')
-            return False
-
-        if operation == 'onTokenTransfer':
-            print('onTokenTransfer() called')
-            return handle_token_received(caller, args)
-
-    return False
+		if operation == 'onTokenTransfer':
+			print('onTokenTransfer() called')
+			return handle_token_received(caller, args)
+	return False
+def Initialize():
+	Put('state','Active')
+	return True
 
 def GetState():
 	return Get('state')
 
-def GetBalance(operation,args):
-	originator = args[0]
-	assetID = args[1]
-	balanceKey = BalanceKey(originator,assetID)
-	return Get('balanceKey'):
+def GetBalance(originator, assetId):
+	balanceKey = originator + assetId
+	return Get(balanceKey)
 
-def GetPool(poolID,poolHash,pool):
+def GetPool(poolID, poolHash, pool):
+	poolID = args[0]
+	poolHash = args[1]
+	pool = args[2]
 	if len(pool) == 0:
 		return NewPool()
 	
 	print('Deserializing offer')
 	#Figure out what deserializing will be needed
 	return pool
-
-def VerifySentAmount(operation,args):
-	originator = args[0]
-	assetID = args[1]
-	amount = args[2]
-	
-	if len(assetID) == 32:
+'''
+def VerifySentAmount(originator, assetId, amount):
+	if len(assetId) == 32:
 		#Verify that the offer really has the indicated assets available
-		mycontainer = GetExecutingScriptContainer()
+		mycontainer = GetScriptContainer()
 		#Get outputs of tx
-		outputs = []
-		sentAmount = 0
-		for i in outputs:
-			if i.assetID == assetID and i.ScriptHash == mycontainer['ExecutingScriptHash']:
-				sentAmount += i.Value
+		outputs = 
+		#sentAmount = 0
+		#for i in outputs:
+		#	if i.assetId == assetId and i.ScriptHash == mycontainer['ExecutingScriptHash']:
+		#		sentAmount += i.Value
 	
-	if sentAmount != amount:
-		return False
+	#if sentAmount != amount:
+	#	return False
 
-	alreadyVerified = Get(mycontainer['hash']+assetID)
+	alreadyVerified = Get(mycontainer['hash']+assetId)
 	if alreadyVerified:
 		return False
 	
-	Put(mycontainer['hash']+assetID, '1')
+	Put(mycontainer['hash']+assetId, '1')
 
 	return True
-
-def TransferAsseetTo(operation,args):
-	originator = args[0]
-	assetID = args[1]
-	amount = args[3]
-	
+'''
+def TransferAssetTo(originator, assetID, amount):
 	if amount < 1:
 		print('Amount ot transfer is less than 1')
 		return False
 
-	key = BalanceKey(originator,assetID)
+	key = originator+assetID
 	currentBalance = Get(key)
 	Put(key,currentBalance + amount)
+	return True
 
-def NewContribution(operation,args):
+def NewContribution(operation, args):
 	#Create New contribution
 	#return object Contribution
 
+	return True
+
+def Hash(contribution):
+	#Will need to return hash256 of poolid, amount as byte array, nonce
 	return True
 
 def MakeContribution(contribution):
@@ -249,43 +239,40 @@ def MakeContribution(contribution):
 	Created(contribution['makerAddress'],contributionHash,contribution['contributionAssetID'],contribution['amount'])
 	return True
 
-def NewCompletePool(operation,args):
+def NewCompletePool(operatorAddress, poolID, poolHash, amountToFill):
 	#Update Pool such that status is now Complete
-	operatorAddress = args[0]
-	poolID = args[1]
-	poolHash = args[2]
-	amountToFill = args[3]
 	pool = GetPool(poolID,poolHash)
 	
 	if not CheckWitness(operatorAddress):
 		return False
 
 	if pool['MakerAddress'] == None:
-		Failed(operatorAddress, poolHash)
+		#Notify failed
+		#Failed(operatorAddress, poolHash)
 		return True
 	
 	if operatorAddress != pool['MakerAddress']:
 		return False
 	
 	#Move Asset
-	TrasnferAssetTo(operatorAddress,pool['PoolAssetID'],amountToFill)
+	TransferAssetTo(operatorAddress,pool['PoolAssetID'],amountToFill)
 	
 	#Notify Clients
-	Transferred(operatorAddres,pool['PoolAssetID'],amountToFill)
+	#Transferred(operatorAddress,pool['PoolAssetID'],amountToFill)
 
 	#Store Pool
 	StorePool(poolID,poolHash,pool)
 
 	return True
 
-def StorePool(poolID,poolHash,pool):
+def StorePool(poolID, poolHash, pool):
 	if not Put(poolID+poolHash, pool):
 		return False
 
 def ProcessWithdrawal():
-	mycontainer = GetExecutingScriptContainer()
+	mycontainer = GetScriptContainer()
 	myhash = GetExecutingScriptHash()
-	withdrawlStage = WithdrawlStage(mycontainer)
+	withdrawlStage = WithdrawStage(mycontainer)
 	if withdrawlStage == None:
 		return False
 
@@ -296,8 +283,8 @@ def ProcessWithdrawal():
 	else:
 		isWithdrawingNEP5 = False
 	
-	inputs = mycontainer.GetInputs()
-	outputs = mycontainer.GetOutputs()
+	#inputs = mycontainer.GetInputs()
+	#outputs = mycontainer.GetOutputs()
 	
 	if withdrawlStage == 'Mark':
 		amount = GetBalance(withdrawingAddr, assetID)
@@ -315,11 +302,95 @@ def ProcessWithdrawal():
 	Withdrawing(withdrawingAddr, assetID, amount)
 	return True
 
+def WhitelistKey(assetID):
+	if len(assetID) != 1:
+		return False
+	whitelistID="contractWhitelist"+assetID
+	return whitelistID
+
+def RemoveSingleWhitelist(assetID):
+	#This is a function to remove a single assetID that was passed from whitelist
+	#Need to figure out later
+	return True
+
+def ReduceBalance(makerAddress, poolID, contirbutionHash, amount):
+	if amount < 1:
+		print("Amount to reduce is less than 1")
+		return False
+	
+	key = makerAddress + assetID
+	currentBalance = Get(key)
+	newBalance = currentBalance - amount
+
+	if newBalance < 0:
+		print("Not Enough")
+		return False
+	
+	if newBalance > 0:
+		Put(key,newBalance)
+	else:
+		Delete(key)
+
+	return True
+
+def Created(makerAddress, contributionHash, contributionAssetID, amount):
+	#Used to notify clients of event
+	#Will need futher research to complete in python
+	return True
+
+def NewPool(): #returns namedtuple, json, something refrencable like pool['makerAddress']
+	#This will need to create a new array that can be passed 
+	#Will require further research
+	return True
+
+def WithdrawStage(mycontainer):
+	#will need to verify that the container object is correct object being sent
+	#Really just needs to be the tx
+	#txAttributes = mycontainer.GetAttributes()
+	#for attr in txAttributes:
+	#	if attr.Usage == '0xa1':
+	#		return attr.Data
+	return None
+
+def GetWithdrawAddress(mycontainer, withdrawalStage):
+	usage = withdrawalStage
+	extraWitness = '0x20'
+	withdrawalAddress = '0xa4'
+	#txAttributes = mycontainer.GetAttributes()
+	#for attr in txAttributes:
+	#	if attr.Usage in NEP5AssetID:
+	#		return attr.Data
+	return None
+
+def GetWithdrawlAsset(mycontainer):
+	#txAttributes = mycontainer.GetAttributes()
+	#for attr in txAttributes:
+	#	if attr.Usage in NEP5AssetID:
+	#		return attr.Data
+	return None
+
+def MarkWithdrawal(withdrawingAddr, assetID, amount):
+	print("Checking last mark")
+	#if not VerifyWithdrawal(withdrawingAddr, assetID):
+	#	return False
+	
+	print("Marking withdrawal")
+	if not ReduceBalance(withdrawingAddr, assetID, amount):
+		return False
+	
+	key = withdrawingAddr+assetID
+	Put(key,amount)
+
+	return True
+
+def Withdrawing(withdrawingAddr, assetID, amount):
+	#This is another of the notify type actions
+	#The ones that have the displaynames
+	return True
+
 def handle_token_received(chash, args):
 
-    arglen = len(args)
-
-    if arglen < 3:
+    if len(args) < 3:
         print('arg length incorrect')
         return False
 
@@ -327,7 +398,7 @@ def handle_token_received(chash, args):
     t_to = args[1]
     t_amount = args[2]
 
-    if arglen == 4:
+    if len(args) == 4:
         extra_arg = args[3]  # extra argument passed by transfer()
 
     if len(t_from) != 20:
