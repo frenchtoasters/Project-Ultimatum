@@ -216,8 +216,14 @@ def TransferAsseetTo(operation,args):
 def NewContribution(operation,args):
 	#Create New contribution
 	#return object Contribution
-
-	return True
+    makerAddress = args[0]
+    assetID = args[1]
+    poolID = args[2]
+    amount = args[3]
+    nonce = args[4]
+    epoch = args[5]
+    Contribution = {"makerAddress":makerAddress, "assetID":assetID, "poolID":poolID, "amount":amount, "nonce":nonce, "epoch": epoch} 
+	return Contribution
 
 def MakeContribution(contribution):
 	if not CheckWitness(contribution['owner']):
