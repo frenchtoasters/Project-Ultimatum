@@ -12,6 +12,7 @@ from boa.interop.Neo.TriggerType import Application, Verification
 from boa.interop.System.ExecutionEngine import GetExecutingScriptHash, GetCallingScriptHash, GetScriptContainer
 from boa.interop.Neo.App import RegisterAppCall
 from boa.interop.Neo.Transaction import TransactionInput, TransactionOutput, Transaction, ContractTransaction
+from boa.code.builtins import concat, substr
 
 OWNER = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
 
@@ -25,6 +26,31 @@ MCT_SCRIPTHASH = b'\x8dKL\x14V4\x17\xc6\x91\x91\xe0\x8b\xe0\xb8m\xdc\xb4\xbc\x86
 # privatenet
 MCTContract = RegisterAppCall('c186bcb4dc6db8e08be09191c6173456144c4b8d', 'operation', 'args')
 
+class EmptyPool():
+	MakerAddress = ''
+	PoolID = ''
+	PoolCategory = ''
+	PoolAssetID = ''
+	MaxPool = 0
+	MinDeposit = 1
+	MaxDeposit = 1
+	CurrentSize = 0
+	Amount = 0
+	StartTime = 0
+	EndTime = 0
+	MakerCommand = ''
+	Nonce = 0
+	Epoch = 1527809777
+
+class EmptyContribution(EmptyPool):
+	contribAddress = ''
+	assetID = ''
+	poolID = ''
+	amount = 0
+	nonce = 0
+	epoch = 1527809777
+		
+	
 def Main(operation, args):
 	trigger = GetTrigger()
 
@@ -56,8 +82,8 @@ def Main(operation, args):
 			return GetState()
 		if operation == 'getBalance':
 			return GetBalance(args[0],args[1])
-		#if operation == 'getPool':
-		#	return GetPool(args[0],args[1],args[2])
+		if operation == 'getPool':
+			return GetPool(args[0],args[1])
 		if operation == 'deopsit':
 			if GetState() != 'Active':
 				return False
@@ -77,6 +103,17 @@ def Main(operation, args):
 			contribution = NewContribution(operation,args)
 			return MakeContribution(contribution)
 		
+		if operation == 'createPool':
+			if GetState() != 'Active':
+				return False
+			if len(args) != 15:
+				return False
+			
+			pool = CreateNewPool(operation, args)
+			poolHash = Hash(pool)
+			return StorePool(args[1], poolHash, pool)
+			 
+
 		if operation == 'completePool':
 			if GetState() != 'Active':
 				return False
@@ -85,8 +122,8 @@ def Main(operation, args):
 				return False
 
 			completePool = NewCompletePool(args[0],args[1],args[2],args[3])
-			pool = GetPool(completePool['PoolID'],completePool['PoolHash'],completePool)
-			return StorePool(completePool['PoolID'],completePool['PoolHash'],pool)
+			pool = GetPool(completePool.PoolID,completePool.PoolHash)
+			return StorePool(completePool.PoolID,completePool.PoolHash,pool)
 
 		if operation == 'withdraw':
 			return ProcessWithdrawal()
@@ -154,18 +191,17 @@ def GetState():
 
 def GetBalance(originator, assetId):
 	balanceKey = originator + assetId
-	return Get(balanceKey)
+	balance = Get(balanceKey)
+	return balance
 
-def GetPool(poolID, poolHash, pool):
-	poolID = args[0]
-	poolHash = args[1]
-	pool = args[2]
-	if len(pool) == 0:
-		return NewPool()
-	
+def GetPool(poolID, poolHash) -> EmptyPool:
+	Pool = EmptyPool()
+
 	print('Deserializing offer')
 	#Figure out what deserializing will be needed
-	return pool
+	pool = Get(poolID+poolHash)
+	
+	return Pool
 '''
 def VerifySentAmount(originator, assetId, amount):
 	if len(assetId) == 32:
@@ -199,50 +235,144 @@ def TransferAssetTo(originator, assetID, amount):
 	Put(key,currentBalance + amount)
 	return True
 
-def NewContribution(operation, args):
+def CreateNewPool(operation,args) -> EmptyPool:
+	#Validate Args
+	if len(args) != 14:
+		print("To few args")
+		return False
+	#Create New Pool
+	Pool = EmptyPool()
+	
+	#Create Object
+	Pool.MakerAddress = args[0]
+	Pool.PoolID = args[1]
+	Pool.PoolCategory = args[2]
+	Pool.PoolAssetID = args[3]
+	Pool.MaxPool = args[4]
+	Pool.MinDeposit = args[5]
+	Pool.MaxDeposit = args[6]
+	Pool.CurrentSize = args[7]
+	Pool.Amount = args[8]
+	Pool.StartTime = args[9]
+	Pool.EndTime = args[10]
+	Pool.MakerCommand = args[11]
+	Pool.Nonce = args[12]
+	Pool.Epoch = args[13]
+	return Pool
+
+def NewContribution(operation,args) -> EmptyContribution:
+	#Validate Args
+	if len(args) != 6:
+		print("To few args")
+		return False
+
 	#Create New contribution
-	#return object Contribution
-    makerAddress = args[0]
-    assetID = args[1]
-    poolID = args[2]
-    amount = args[3]
-    nonce = args[4]
-    epoch = args[5]
-    Contribution = {"makerAddress":makerAddress, "assetID":assetID, "poolID":poolID, "amount":amount, "nonce":nonce, "epoch": epoch} 
+	Contribution = EmptyContribution()
+	
+	#Create Object
+	Contribution.contribAddress = args[0]
+	Contribution.assetID = args[1]
+	Contribution.poolID = args[2]
+	Contribution.amount = args[3]
+	Contribution.nonce = args[4]
+	Contribution.epoch = args[5]
+	
+	#Need to validate Contribution
+	if not VerifyContribution(Contribution):
+		return False	
+	
 	return Contribution
 
-def Hash(contribution):
+def Hash(item):
 	#Will need to return hash256 of poolid, amount as byte array, nonce
-	return True
+	item_len = len(item)
+	
+	#one byte
+	if item_len <= 255:
+		byte_len = b'\x01'
+	#two bytes
+	elif item_len <= 65535:
+		 byte_len = b'\x02'
+	#four bytes
+	else:
+		byte_len = b'\x04'
+	
+	out = concat(byte_len, item_len)
+	
+	return out
 
+def deserialize_bytearray(item):
+	# neo-boa bug, Something is require here for some reason...
+	print('deserialize_bytearray')
+
+	# get length of length
+    collection_length_length = substr(item, 0, 1)
+
+    # get length of collection
+    collection_len = substr(item, 1, collection_length_length)
+
+    # create a new collection
+    new_collection = list(length=collection_len)
+
+    # calculate offset
+    offset = 1 + collection_length_length
+
+    # trim the length data
+    newdata = data[offset:]
+
+    for i in range(0, collection_len):
+
+    	# get the data length length
+        itemlen_len = substr(newdata, 0, 1)
+
+        # get the length of the data
+        item_len = substr(newdata, 1, itemlen_len)
+
+        start = 1 + itemlen_len
+        end = start + item_len
+
+        # get the data
+        item = substr(newdata, start, item_len)
+
+        # store it in collection
+        new_collection[i] = item
+
+        # trim the data
+        newdata = newdata[end:]
+
+    return new_collection
+	
 def MakeContribution(contribution):
 	if not CheckWitness(contribution['owner']):
 		return False
 	
-	poolID = contribution['poolID']
+	poolID = contribution.poolID
 	contributionHash = Hash(contribution)
 	pool = GetPool(poolID)
+
+	Pool = EmptyPool()
+	Pool = deserialize_bytearray(pool)
 
 	if Get(poolID+contributionHash) != None:
 		return False
 	
-	if not contribution['amount'] > 0:
+	if not contribution.amount > 0:
 		return False
 
-	if not contribution['amount'] > pool['MinDeposit']:
+	if not contribution.amount > Pool.MinDeposit:
 		return False
 	
-	if contribution['amount'] + pool['CurrentSize'] > pool['MaxSize']:
+	if contribution.amount + Pool.CurrentSize > Pool.MaxSize:
 		 return False
 
-	if not ReduceBalance(contribution['makerAddress'],poolID,contributionHash,contribution['amount']):
+	if not ReduceBalance(contribution.contribAddress,poolID,contributionHash,contribution.amount):
 		return False
 
 	#Add the contribution to storage
-	StorePool(poolID,contributionHash,pool)
+	StorePool(poolID,contributionHash,Pool)
 
 	#Notify Clients
-	Created(contribution['makerAddress'],contributionHash,contribution['contributionAssetID'],contribution['amount'])
+	Created(contribution.contribAddress,contributionHash,contribution.assetID,contribution.amount)
 	return True
 
 def NewCompletePool(operatorAddress, poolID, poolHash, amountToFill):
@@ -300,10 +430,10 @@ def ProcessWithdrawal():
 	byteArray = ['0']
 	if isWithdrawingNEP5:
 		Put(myhash+byteArray,withdrawingAddr)
-	else:
-		value = 0
-		for output in outputs:
-			value += outputs[output]['Value']
+	#else:
+	#	value = 0
+	#	for output in outputs:
+	#		value += outputs[output]['Value']
 	
 	Withdrawing(withdrawingAddr, assetID, amount)
 	return True
@@ -344,10 +474,11 @@ def Created(makerAddress, contributionHash, contributionAssetID, amount):
 	#Will need futher research to complete in python
 	return True
 
-def NewPool(): #returns namedtuple, json, something refrencable like pool['makerAddress']
+def NewPool() -> EmptyPool: #returns namedtuple, json, something refrencable like pool['makerAddress']
 	#This will need to create a new array that can be passed 
 	#Will require further research
-	return True
+	Pool = EmptyPool()
+	return Pool
 
 def WithdrawStage(mycontainer):
 	#will need to verify that the container object is correct object being sent
