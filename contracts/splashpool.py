@@ -46,6 +46,7 @@ class EmptyContribution(EmptyPool):
 	contribAddress = ''
 	assetID = ''
 	poolID = ''
+	contribID = ''
 	amount = 0
 	nonce = 0
 	epoch = 1527809777
@@ -262,7 +263,7 @@ def CreateNewPool(operation,args) -> EmptyPool:
 
 def NewContribution(operation,args) -> EmptyContribution:
 	#Validate Args
-	if len(args) != 6:
+	if len(args) != 7:
 		print("To few args")
 		return False
 
@@ -273,9 +274,10 @@ def NewContribution(operation,args) -> EmptyContribution:
 	Contribution.contribAddress = args[0]
 	Contribution.assetID = args[1]
 	Contribution.poolID = args[2]
-	Contribution.amount = args[3]
-	Contribution.nonce = args[4]
-	Contribution.epoch = args[5]
+	Contribution.contribID = args[3]
+	Contribution.amount = args[4]
+	Contribution.nonce = args[5]
+	Contribution.epoch = args[6]
 	
 	#Need to validate Contribution
 	if not VerifyContribution(Contribution):
