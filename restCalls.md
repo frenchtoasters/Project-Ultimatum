@@ -1,4 +1,4 @@
-# Rest Calls required
+# Rest Calls
 
 CreatePool:
 
