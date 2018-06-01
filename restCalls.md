@@ -1,7 +1,9 @@
 # Rest Calls required
 
 CreatePool:
+
 	-args:
+	
 		MakerAddress #Neo address of current owner
 		PoolID #Suffenctly random ID
 		PoolCategory #TBD
@@ -18,7 +20,9 @@ CreatePool:
 		Epoch #Current Epoch
 		
 UpdatePool:
+
 	-args:	
+	
 		MakerAddress #Neo address of current owner
 		PoolID #ID of pool to be updated
 		MakerCommand #Command that creator can send
@@ -26,7 +30,9 @@ UpdatePool:
 		Epoch #Current Epoch
 
 CompletePool:
+
 	-args:
+	
 		MakerAddress #Neo address of current owner
 		PoolID #ID of pool to be completed
 		MakerCommand #Command that creator can send
@@ -34,7 +40,9 @@ CompletePool:
 		Epoch #Current Epoch
 
 MakeContribution:
+
 	-args:
+	
 		contribAddress #Neo address of current owner
 		assetID #Neo assetID
 		poolID #ID of pool for contribution
@@ -43,7 +51,9 @@ MakeContribution:
 		epoch #Current Epoch
 
 CancelContribution:
+
 	-args:
+	
 		contribAddress #Neo address of current owner
 		assetID #NEO assetID
 		contribID #ID of contribution
