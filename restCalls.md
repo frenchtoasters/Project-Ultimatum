@@ -1,5 +1,6 @@
 # Rest Calls required
-CreatePool
+
+CreatePool:
 	-args:
 		MakerAddress #Neo address of current owner
 		PoolID #Suffenctly random ID
@@ -16,7 +17,7 @@ CreatePool
 		Nonce 
 		Epoch #Current Epoch
 		
-UpdatePool
+UpdatePool:
 	-args:	
 		MakerAddress #Neo address of current owner
 		PoolID #ID of pool to be updated
@@ -24,7 +25,7 @@ UpdatePool
 		Nonce
 		Epoch #Current Epoch
 
-CompletePool
+CompletePool:
 	-args:
 		MakerAddress #Neo address of current owner
 		PoolID #ID of pool to be completed
@@ -32,7 +33,7 @@ CompletePool
 		Nonce
 		Epoch #Current Epoch
 
-MakeContribution
+MakeContribution:
 	-args:
 		contribAddress #Neo address of current owner
 		assetID #Neo assetID
@@ -41,7 +42,7 @@ MakeContribution
 		nonce 
 		epoch #Current Epoch
 
-CancelContribution
+CancelContribution:
 	-args:
 		contribAddress #Neo address of current owner
 		assetID #NEO assetID
